@@ -1,6 +1,7 @@
 import logging
 import time
 import os
+from http import HTTPStatus
 
 import requests
 import telegram
@@ -36,20 +37,29 @@ HOMEWORK_STATUSES = {
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
     text = message
-    bot.send_message(TELEGRAM_CHAT_ID, text)
+    try:
+        bot.send_message(TELEGRAM_CHAT_ID, text)
+    except telegram.error as error:
+        logging.error(f'Ошибка отправки сообщения {error}')
 
 
 def get_api_answer(current_timestamp):
     """Делает запрос к эндпоинту API-сервиса."""
     timestamp = current_timestamp or int(time.time())
+    if (current_timestamp is None) and (int(time.time() is None)):
+        raise Exception('Ошибка запроса времени')
+    if current_timestamp < 0 and int(time.time()) < 0:
+        raise Exception('Ошибка запроса времени')
     params = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code == 500:
+        if response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
             response.raise_for_status()
-        if response.status_code != 200:
+        if response.status_code != HTTPStatus.OK:
             response.raise_for_status()
         return response.json()
+    except TypeError as error:
+        logger.error(f'Object of type bytes is not JSON serializable {error}')
     except requests.exceptions.TimeoutError as error:
         logger.error(f'Ошибка ожидания: {error}')
     except requests.exceptions.RequestException as error:
@@ -65,7 +75,7 @@ def check_response(response):
     elif len(response) == 0:
         raise Exception('Response пустой')
     elif 'homeworks' not in response:
-        raise Exception('Нет ключа в response')
+        raise Exception('отсутствует переменная в homeworks')
     elif type(response['homeworks']) is not list:
         raise Exception('Тип homeworks не list')
     else:
@@ -79,8 +89,11 @@ def parse_status(homework):
     except KeyError:
         logger.error('Неверный ответ сервера')
         raise
-
-    homework_status = homework['status']
+    try:
+        homework_status = homework['status']
+    except KeyError:
+        logger.error('Неверный ответ сервера')
+        raise
 
     if ((homework_status is None) or (
             homework_status == '')) or (
@@ -94,23 +107,24 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    if PRACTICUM_TOKEN is None:
-        logger.critical('критическая ошибка')
-        return False
-    elif TELEGRAM_TOKEN is None:
-        logger.critical('критическая ошибка')
-        return False
-    elif TELEGRAM_CHAT_ID is None:
-        logger.critical('критическая ошибка')
-        return False
-    else:
-        return True
+    tokens = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
+    for token in tokens:
+        if token is None:
+            logger.critical(
+                'отсутствует необходимая для запуска бота переменная {token}')
+            return False
+    return True
 
 
 def main():
     """Основная работа бота."""
     logger.info('Бот запущен')
-    bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    try:
+        bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    except telegram.error.InvalidToken as error:
+        logging.error(f'Невалидный токен {error}')
+    except telegram.error as error:
+        logging.error(f'Ошибка запуска бота {error}')
     current_timestamp = int(time.time())
 
     while True:
