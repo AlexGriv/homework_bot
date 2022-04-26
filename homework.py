@@ -36,9 +36,8 @@ HOMEWORK_STATUSES = {
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
-    text = message
     try:
-        bot.send_message(TELEGRAM_CHAT_ID, text)
+        bot.send_message(TELEGRAM_CHAT_ID, message)
     except telegram.error as error:
         logging.error(f'Ошибка отправки сообщения {error}')
 
@@ -46,10 +45,6 @@ def send_message(bot, message):
 def get_api_answer(current_timestamp):
     """Делает запрос к эндпоинту API-сервиса."""
     timestamp = current_timestamp or int(time.time())
-    if (current_timestamp is None) and (int(time.time() is None)):
-        raise Exception('Ошибка запроса времени')
-    if current_timestamp < 0 and int(time.time()) < 0:
-        raise Exception('Ошибка запроса времени')
     params = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
@@ -86,13 +81,13 @@ def parse_status(homework):
     """Извлекает из информации о конкретной домашней работе статус работы."""
     try:
         homework_name = homework['homework_name']
-    except KeyError:
-        logger.error('Неверный ответ сервера')
+    except KeyError as error:
+        logger.error(f'Неверный ответ сервера: {error}')
         raise
     try:
         homework_status = homework['status']
-    except KeyError:
-        logger.error('Неверный ответ сервера')
+    except KeyError as error:
+        logger.error(f'Неверный ответ сервера: {error}')
         raise
 
     if ((homework_status is None) or (
@@ -111,7 +106,7 @@ def check_tokens():
     for token in tokens:
         if token is None:
             logger.critical(
-                'отсутствует необходимая для запуска бота переменная {token}')
+                f'отсутствует необходимая для запуска бота переменная {token}')
             return False
     return True
 
