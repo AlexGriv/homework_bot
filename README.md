@@ -27,3 +27,6 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 ## Запустить проект:
 python homework.py
+
+## Автор
+AlexGriv https://github.com/AlexGriv
